@@ -2,6 +2,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "gdt.h"
+
 // vga console
 typedef enum {
     VGA_COLOR_BLACK = 0,
@@ -179,6 +181,8 @@ void urcl_out(urcl_t port, urcl_t data) {
 }
 
 void kernel_main() {
+    init_gdt();
+
     terminal_initialize();
     terminal_writestring("Hello, kernel World!\nHere's a newline!\n");
     (void) urcl_main();
