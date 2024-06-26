@@ -1,4 +1,3 @@
-use core::sync::atomic::*;
 use crate::{gdt, print, println};
 use lazy_static::lazy_static;
 use pic8259::ChainedPics;
