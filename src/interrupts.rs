@@ -1,3 +1,4 @@
+use core::sync::atomic::*;
 use crate::{gdt, print, println};
 use lazy_static::lazy_static;
 use pic8259::ChainedPics;
@@ -58,7 +59,7 @@ extern "x86-interrupt" fn double_fault_handler(
 }
 
 extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFrame) {
-    print!(".");
+    // print!(".");
     unsafe {
         PICS.lock()
             .notify_end_of_interrupt(InterruptIndex::Timer.as_u8());
@@ -86,8 +87,9 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: InterruptStac
     if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
         if let Some(key) = keyboard.process_keyevent(key_event) {
             match key {
-                DecodedKey::Unicode(character) => print!("{}", character),
-                DecodedKey::RawKey(key) => print!("{:?}", key),
+                DecodedKey::Unicode('\x08') => crate::keyboard::register_key(127),
+                DecodedKey::Unicode(ch) => crate::keyboard::register_key(ch as _),
+                DecodedKey::RawKey(key) => print!("  RAWKEY{:?}  ", key),
             }
         }
     }

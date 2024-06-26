@@ -3,6 +3,7 @@ name = "urclos"
 version = "0.1.0"
 authors = ["Philipp Oppermann <dev@phil-opp.com>", "funnsam"]
 edition = "2021"
+links = "urcl"
 
 [dependencies]
 bootloader = "0.9"

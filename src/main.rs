@@ -8,12 +8,18 @@ mod gdt;
 mod interrupts;
 mod serial;
 mod vga_buffer;
+mod keyboard;
+
+mod fs;
+mod bindings;
 
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
     println!("Hello World{}", "!");
 
     init();
+
+    unsafe { bindings::urcl_main(); }
 
     println!("It did not crash!");
     hlt_loop();

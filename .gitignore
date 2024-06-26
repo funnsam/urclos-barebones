@@ -1,1 +1,6 @@
 /target
+/src/fs.rs
+*.a
+*.o
+*.bc
+*.ll
