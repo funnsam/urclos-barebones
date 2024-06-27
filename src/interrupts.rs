@@ -1,4 +1,4 @@
-use crate::{gdt, print, println};
+use crate::{gdt, println};
 use lazy_static::lazy_static;
 use pic8259::ChainedPics;
 use spin;
@@ -30,6 +30,7 @@ pub static PICS: spin::Mutex<ChainedPics> =
 lazy_static! {
     static ref IDT: InterruptDescriptorTable = {
         let mut idt = InterruptDescriptorTable::new();
+        x86_64::set_general_handler!(&mut idt, help);
         idt.breakpoint.set_handler_fn(breakpoint_handler);
         unsafe {
             idt.double_fault
@@ -47,14 +48,22 @@ pub fn init_idt() {
 }
 
 extern "x86-interrupt" fn breakpoint_handler(stack_frame: InterruptStackFrame) {
-    println!("EXCEPTION: BREAKPOINT\n{:#?}", stack_frame);
+    println!("EXCEPTION: BREAKPOINT\n{:?}", stack_frame);
+}
+
+fn help(
+    stack_frame: InterruptStackFrame,
+    index: u8,
+    _error_code: Option<u64>,
+) {
+    panic!("EXCEPTION: {index} {_error_code:?} \n{:?}", stack_frame);
 }
 
 extern "x86-interrupt" fn double_fault_handler(
     stack_frame: InterruptStackFrame,
     _error_code: u64,
 ) -> ! {
-    panic!("EXCEPTION: DOUBLE FAULT\n{:#?}", stack_frame);
+    panic!("EXCEPTION: DOUBLE FAULT\n{:?}", stack_frame);
 }
 
 extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFrame) {
@@ -88,7 +97,7 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: InterruptStac
             match key {
                 DecodedKey::Unicode('\x08') => crate::keyboard::register_key(127),
                 DecodedKey::Unicode(ch) => crate::keyboard::register_key(ch as _),
-                DecodedKey::RawKey(key) => print!("  RAWKEY{:?}  ", key),
+                DecodedKey::RawKey(_key) => {}, // print!("  RAWKEY{:?}  ", key),
             }
         }
     }

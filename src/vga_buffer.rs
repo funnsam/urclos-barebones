@@ -38,6 +38,21 @@ pub enum Color {
     White = 15,
 }
 
+impl Color {
+    pub fn from_code(c: u8) -> Option<Self> {
+        if c > 15 { return None; }
+        Some(unsafe { core::mem::transmute(c) })
+    }
+
+    pub fn bright(&self) -> Option<Self> {
+        Self::from_code(*self as u8 + 8)
+    }
+
+    pub fn dim(&self) -> Option<Self> {
+        Self::from_code(*self as u8 - 8)
+    }
+}
+
 /// A combination of a foreground and a background color.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
@@ -73,15 +88,12 @@ struct Buffer {
 /// `core::fmt::Write` trait.
 pub struct Writer {
     pub column_position: usize,
-    fg: Color,
-    bg: Color,
+    pub fg: Color,
+    pub bg: Color,
     buffer: &'static mut Buffer,
 }
 
 impl Writer {
-    pub fn set_foreground(&mut self, c: Color) { self.fg = c; }
-    pub fn set_background(&mut self, c: Color) { self.bg = c; }
-
     /// Writes an ASCII byte to the buffer.
     ///
     /// Wraps lines at `BUFFER_WIDTH`. Supports the `\n` newline character.
@@ -105,6 +117,21 @@ impl Writer {
         }
     }
 
+    pub fn fuck(&mut self, byte: u8) {
+        if self.column_position >= BUFFER_WIDTH {
+            self.new_line();
+        }
+
+        let row = BUFFER_HEIGHT - 1;
+        let col = self.column_position;
+
+        self.buffer.chars[row][col].write(ScreenChar {
+            ascii_character: byte,
+            color_code: ColorCode::new(Color::White, Color::Blue),
+        });
+        self.column_position += 1;
+    }
+
     /// Writes the given ASCII string to the buffer.
     fn write_string(&mut self, s: &str) {
         for byte in s.bytes() {
@@ -121,6 +148,17 @@ impl Writer {
         }
     }
 
+    pub fn erase_all(&mut self) {
+        for row in 0..BUFFER_HEIGHT {
+            for col in 0..BUFFER_WIDTH {
+                self.buffer.chars[row][col].write(ScreenChar {
+                    ascii_character: b' ',
+                    color_code: self.get_color_code(),
+                });
+            }
+        }
+    }
+
     /// Shifts all lines one line up and clears the last row.
     fn new_line(&mut self) {
         for row in 1..BUFFER_HEIGHT {
@@ -129,7 +167,7 @@ impl Writer {
                 self.buffer.chars[row - 1][col].write(character);
             }
         }
-        self.clear_row(BUFFER_HEIGHT - 1);
+        self.erase_row(BUFFER_HEIGHT - 1);
         self.column_position = 0;
     }
 
@@ -138,7 +176,7 @@ impl Writer {
     }
 
     /// Clears a row by overwriting it with blank characters.
-    fn clear_row(&mut self, row: usize) {
+    pub fn erase_row(&mut self, row: usize) {
         let blank = ScreenChar {
             ascii_character: b' ',
             color_code: self.get_color_code(),

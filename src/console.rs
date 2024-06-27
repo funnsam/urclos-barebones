@@ -1,10 +1,10 @@
 //! VGA buffer wrapper with (limited) VT100 code supports
-use core::fmt::{self, Write};
+use core::fmt;
 use spin::Mutex;
 use x86_64::instructions::port::*;
 use crate::vga_buffer::*;
 
-const BUF_LEN: usize = 5;
+const BUF_LEN: usize = 7;
 struct Vt100 {
     in_ctrl: bool,
     control_buf: [u8; BUF_LEN],
@@ -22,7 +22,7 @@ lazy_static::lazy_static! {
 impl Vt100 {
     fn reject_code(&mut self) {
         self.in_ctrl = false;
-        self.write_string("[rej]");
+        // self.write_string("[rej]");
         for i in 0..self.control_len {
             self.write_byte(self.control_buf[i]);
         }
@@ -45,51 +45,48 @@ impl Vt100 {
                         .and_then(|s| s.parse().ok())
                         .unwrap_or(0);
                 },
-                b'K' if self.control_len == 1 => {
+                b'K' if self.control_len == 1 && self.control_buf[0] == b'[' => {
                     self.in_ctrl = false;
                     WRITER.lock().erase_until_eol();
                 },
-                b'm' => {
+                b'J' if self.control_len == 2 && self.control_buf[0] == b'[' => {
                     self.in_ctrl = false;
-
-                    if self.control_len < 2 || self.control_buf[0] != b'[' {
-                        self.reject_code();
-                        return;
-                    }
-
                     let mut wr = WRITER.lock();
-                    match (self.control_buf[1], self.control_len) {
-                        (b'0', 2) => {
-                            wr.set_foreground(Color::LightGray);
-                            wr.set_background(Color::Black);
-                        },
-                        (b'1', 2) => {},
-                        (b'3', 3) => wr.set_foreground(match self.control_buf[2] {
-                            b'0' => Color::Black,
-                            b'1' => Color::Red,
-                            b'2' => Color::Green,
-                            b'3' => Color::Yellow,
-                            b'4' => Color::Blue,
-                            b'5' => Color::Magenta,
-                            b'6' => Color::Cyan,
-                            b'7' => Color::LightGray,
-                            b'9' => Color::LightGray,
-                            _ => { self.reject_code(); return; }
-                        }),
-                        (b'4', 3) => wr.set_background(match self.control_buf[2] {
-                            b'0' => Color::Black,
-                            b'1' => Color::Red,
-                            b'2' => Color::Green,
-                            b'3' => Color::Yellow,
-                            b'4' => Color::Blue,
-                            b'5' => Color::Magenta,
-                            b'6' => Color::Cyan,
-                            b'7' => Color::LightGray,
-                            b'9' => Color::LightGray,
-                            _ => { self.reject_code(); return; }
-                        }),
+
+                    match self.control_buf[1] {
+                        b'2' => wr.erase_all(),
                         _ => self.reject_code(),
                     }
+                },
+                b'm' if self.control_len > 1 && self.control_buf[0] == b'[' => {
+                    self.in_ctrl = false;
+
+                    let mut wr = WRITER.lock();
+                    let mut nuh_uh = false;
+
+                    for c in self.control_buf[1..self.control_len].split(|c| *c == b';') {
+                        match (c[0], c.len()) {
+                            (b'0', 1) => {
+                                wr.fg = Color::LightGray;
+                                wr.bg = Color::Black;
+                            },
+                            (b'1', 1) => { wr.fg.bright().map(|c| wr.fg = c); },
+                            (b'2', 1) => { wr.fg.dim().map(|c| wr.fg = c); },
+                            (b'3', 2) => wr.fg = match c[1] {
+                                b'0'..=b'7' => Color::from_code(c[1] - b'0').unwrap(),
+                                b'9' => Color::LightGray,
+                                _ => { nuh_uh = true; break; },
+                            },
+                            (b'4', 2) => wr.bg = match c[1] {
+                                b'0'..=b'7' => Color::from_code(c[1] - b'0').unwrap(),
+                                b'9' => Color::LightGray,
+                                _ => { nuh_uh = true; break; },
+                            },
+                            _ => { nuh_uh = true; break; },
+                        }
+                    }
+
+                    if nuh_uh { self.reject_code(); }
                 },
                 _ => {
                     self.control_buf[self.control_len] = b;
@@ -99,11 +96,15 @@ impl Vt100 {
                     }
                 },
             }
-        } else if b == 0x1b {
-            self.in_ctrl = true;
-            self.control_len = 0;
         } else {
-            WRITER.lock().write_byte(b);
+            match b {
+                0x07 => {},
+                0x1b => {
+                    self.in_ctrl = true;
+                    self.control_len = 0;
+                },
+                _ => WRITER.lock().write_byte(b),
+            }
         }
     }
 
