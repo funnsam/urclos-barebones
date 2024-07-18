@@ -1,6 +1,8 @@
 use core::sync::atomic::*;
 use crate::*;
 
+pub static USE_DISK: AtomicBool = AtomicBool::new(false);
+
 #[link(name = "urcl")]
 extern "C" {
     pub fn urcl_main();

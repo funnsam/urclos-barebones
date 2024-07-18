@@ -4,7 +4,7 @@ use spin::Mutex;
 use x86_64::instructions::port::*;
 use crate::vga_buffer::*;
 
-const BUF_LEN: usize = 7;
+const BUF_LEN: usize = 16;
 struct Vt100 {
     in_ctrl: bool,
     control_buf: [u8; BUF_LEN],
@@ -73,12 +73,12 @@ impl Vt100 {
                             (b'1', 1) => { wr.fg.bright().map(|c| wr.fg = c); },
                             (b'2', 1) => { wr.fg.dim().map(|c| wr.fg = c); },
                             (b'3', 2) => wr.fg = match c[1] {
-                                b'0'..=b'7' => Color::from_code(c[1] - b'0').unwrap(),
+                                b'0'..=b'7' => Color::from_ansi(c[1] - b'0').unwrap(),
                                 b'9' => Color::LightGray,
                                 _ => { nuh_uh = true; break; },
                             },
                             (b'4', 2) => wr.bg = match c[1] {
-                                b'0'..=b'7' => Color::from_code(c[1] - b'0').unwrap(),
+                                b'0'..=b'7' => Color::from_ansi(c[1] - b'0').unwrap(),
                                 b'9' => Color::LightGray,
                                 _ => { nuh_uh = true; break; },
                             },

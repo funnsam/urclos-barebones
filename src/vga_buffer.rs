@@ -39,6 +39,11 @@ pub enum Color {
 }
 
 impl Color {
+    pub fn from_ansi(c: u8) -> Option<Self> {
+        if c > 7 { return None; }
+        Self::from_code(((c & 4) >> 2) | (c & 2) | ((c & 1) << 2))
+    }
+
     pub fn from_code(c: u8) -> Option<Self> {
         if c > 15 { return None; }
         Some(unsafe { core::mem::transmute(c) })
