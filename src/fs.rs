@@ -8,31 +8,46 @@ static START_LBA: AtomicU32 = AtomicU32::new(0);
 static SECTORS: AtomicU32 = AtomicU32::new(0);
 
 pub fn set_disk() {
-    let mut part = [None; 8];
-    print_disk(false, &mut part, 0);
-    print_disk(true, &mut part, 4);
+    let mut parts = [(0, 0); 10];
+    let mut partc = 0;
+    print_disk(false, &mut parts, &mut partc);
+    print_disk(true, &mut parts, &mut partc);
 
-    match part.iter().filter(|p| p.is_some()).count() {
+    match partc {
         2.. => loop {
-            println!("\n\x1b[33mSelect a partition as filesystem [0-7/*]\x1b[0m");
-            let s = keyboard::poll_key() - b'0' as u32;
+            print!("\n\x1b[36;1mSelect a partition as filesystem [0-{}]\x1b[0m ", partc - 1);
 
-            if let Some(Some(p)) = part.get(s as usize) {
-                use_disk(s as usize, *p);
+            let mut s = 0;
+            loop {
+                let k = keyboard::poll_key() as u8;
+                match k {
+                    b'0'..=b'9' => {
+                        s *= 10;
+                        s += (k - b'0') as usize;
+                        print!("{}", k as char);
+                    },
+                    b'\n' => break,
+                    0x7f => {
+                        s /= 10;
+                        print!("\x1b[1D \x1b[1D");
+                    },
+                    _ => {},
+                }
+            }
+
+            println!();
+
+            if let Some(p) = parts[..partc].get(s) {
+                use_disk(s, *p);
                 return;
             } else {
                 #[cfg(not(feature = "ramfs"))] {
-                    println!("\x1b[31;1mInvalid partition\x1b[0m");
+                    println!("\x1b[31;1mInvalid partition #{s}\x1b[0m");
                 }
             }
         },
         1 => {
-            let (s, p) = part.iter()
-                .enumerate()
-                .filter_map(|(s, p)| p.map(|p| (s, p)))
-                .next()
-                .unwrap();
-            use_disk(s, p);
+            use_disk(0, parts[0]);
         },
         0 => {
             #[cfg(not(feature = "ramfs"))] {
@@ -52,7 +67,7 @@ fn use_disk(s: usize, p: (u32, u32)) {
     println!("\x1b[32;1mUsing partition #{s}\x1b[0m\n");
 }
 
-fn print_disk(slave: bool, part: &mut [Option<(u32, u32)>], start_idx: usize) {
+fn print_disk(slave: bool, parts: &mut [(u32, u32)], partc: &mut usize) {
     if let Ok(Some(id)) = ata::identify(slave) {
         let sec = (id[60] as u32) | ((id[61] as u32) << 16);
         println!("\x1b[32;1mDisk {}:\x1b[0m {}KiB", slave as u8, sec >> 1);
@@ -60,7 +75,11 @@ fn print_disk(slave: bool, part: &mut [Option<(u32, u32)>], start_idx: usize) {
         return;
     }
 
-    ata::initialize_read(slave, 0, 1);
+    print_parts(slave, 0, 0, 1, parts, partc)
+}
+
+fn print_parts(slave: bool, lba: u32, lbar: u32, poff: usize, parts: &mut [(u32, u32)], partc: &mut usize) {
+    ata::initialize_read(slave, lba, 1);
 
     if let Ok(mbr) = ata::get_next_chunk() {
         if mbr[0xde] == 0x5a5a {
@@ -69,26 +88,34 @@ fn print_disk(slave: bool, part: &mut [Option<(u32, u32)>], start_idx: usize) {
         }
 
         for (pi, _p) in mbr[0xdf..].chunks_exact(8).take(4).enumerate() {
-            let gpi = start_idx + pi;
-
             let mut p = [0; 16];
             for (p, b) in p.iter_mut().zip(_p.into_iter().flat_map(|w| w.to_le_bytes())) {
                 *p = b;
             }
 
-            if p[0x4] != 0x2c { continue; }
-
-            let lba = u32::from_le_bytes(p[0x8..0xc].try_into().unwrap());
-            let sec = u32::from_le_bytes(p[0xc..0x10].try_into().unwrap());
-            let kib = sec >> 1;
-
-            println!("  \x1b[1m[{gpi}]:\x1b[0m Partition {pi}: LBA {lba}, {kib}KiB");
-
-            part[gpi] = Some((lba, sec));
+            match p[0x4] {
+                0x2c => register(lba, pi + poff, &p, parts, partc),
+                0x05 | 0x0f => {
+                    let lba = u32::from_le_bytes(p[0x8..0xc].try_into().unwrap()) + lbar;
+                    print_parts(slave, lba, if lbar == 0 { lba } else { lbar }, poff.max(4) + 1, parts, partc);
+                },
+                _ => continue,
+            }
         }
     } else {
         println!("  \x1b[31;1mFailed to read MBR\x1b[0m");
     }
+}
+
+fn register(lba: u32, pi: usize, p: &[u8], parts: &mut [(u32, u32)], partc: &mut usize) {
+    let lba = u32::from_le_bytes(p[0x8..0xc].try_into().unwrap()) + lba;
+    let sec = u32::from_le_bytes(p[0xc..0x10].try_into().unwrap());
+    let kib = sec >> 1;
+
+    println!("  \x1b[1m[{partc}]:\x1b[0m Partition {pi}: LBA {lba}, {kib}KiB");
+
+    parts[*partc] = (lba, sec);
+    *partc += 1;
 }
 
 static mut DISK_CACHE: [u16; 256] = [0; 256];
