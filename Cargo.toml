@@ -21,9 +21,3 @@ features = ["spin_no_std"]
 
 [features]
 ramfs = []
-
-[package.metadata.bootimage]
-run-args = [
-    "-drive", "file=fs.img,if=ide,format=raw",
-    "-serial", "stdio",
-]
