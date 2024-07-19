@@ -1,7 +1,17 @@
 URCLOS_PATH=urcl-os/urclos3.urcl
 FS_PATH=urcl-os/fs.bin
 
-run: urclos.img
+run-ide: urclos.img
+	qemu-system-x86_64 -drive file=urclos.img,if=ide,format=raw -serial stdio
+
+run-sata: urclos.img
+	qemu-system-x86_64 \
+		-serial stdio \
+		-drive id=disk,file=urclos.img,if=none,format=raw \
+		-device ahci,id=ahci \
+		-device ide-hd,drive=disk,bus=ahci.0
+
+run-nvme: urclos.img
 	qemu-system-x86_64 -drive file=urclos.img,if=ide,format=raw -serial stdio
 
 urcl.o:
@@ -30,4 +40,4 @@ urclos.img: liburcl.a src/* Cargo.toml Cargo.lock build.rs x86_64-blog_os.json
 clean:
 	- rm *.o *.a *.img src/ramfs.rs
 
-.PHONY: build clean
+.PHONY: run-ide run-sata run-nvme clean

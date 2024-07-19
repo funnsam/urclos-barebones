@@ -50,7 +50,7 @@ pub fn get_next_chunk() -> Result<[u16; 256], ()> {
     unsafe {
         wait_busy_clear();
         wait_ok_or_err();
-        _has_err()?;
+        // _has_err()?;
 
         let mut buf = [0; 256];
         for i in buf.iter_mut() {

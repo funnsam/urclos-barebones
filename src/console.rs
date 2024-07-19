@@ -1,6 +1,5 @@
 //! VGA buffer wrapper with (limited) VT100 code supports
 use core::fmt;
-use spin::Mutex;
 use x86_64::instructions::port::*;
 use crate::vga_buffer::*;
 
@@ -11,13 +10,11 @@ struct Vt100 {
     control_len: usize,
 }
 
-lazy_static::lazy_static! {
-    static ref VT100: Mutex<Vt100> = Mutex::new(Vt100 {
-        in_ctrl: false,
-        control_buf: [0; BUF_LEN],
-        control_len: 0,
-    });
-}
+static mut VT100: Vt100 = Vt100 {
+    in_ctrl: false,
+    control_buf: [0; BUF_LEN],
+    control_len: 0,
+};
 
 impl Vt100 {
     fn reject_code(&mut self) {
@@ -33,25 +30,25 @@ impl Vt100 {
             match b {
                 b'C' if self.control_len > 0 => {
                     self.in_ctrl = false;
-                    WRITER.lock().column_position += core::str::from_utf8(&self.control_buf[1..self.control_len])
+                    get_writer().column_position += core::str::from_utf8(&self.control_buf[1..self.control_len])
                         .ok()
                         .and_then(|s| s.parse().ok())
                         .unwrap_or(0);
                 },
                 b'D' if self.control_len > 0 => {
                     self.in_ctrl = false;
-                    WRITER.lock().column_position -= core::str::from_utf8(&self.control_buf[1..self.control_len])
+                    get_writer().column_position -= core::str::from_utf8(&self.control_buf[1..self.control_len])
                         .ok()
                         .and_then(|s| s.parse().ok())
                         .unwrap_or(0);
                 },
                 b'K' if self.control_len == 1 && self.control_buf[0] == b'[' => {
                     self.in_ctrl = false;
-                    WRITER.lock().erase_until_eol();
+                    get_writer().erase_until_eol();
                 },
                 b'J' if self.control_len == 2 && self.control_buf[0] == b'[' => {
                     self.in_ctrl = false;
-                    let mut wr = WRITER.lock();
+                    let wr = get_writer();
 
                     match self.control_buf[1] {
                         b'2' => wr.erase_all(),
@@ -61,7 +58,7 @@ impl Vt100 {
                 b'm' if self.control_len > 1 && self.control_buf[0] == b'[' => {
                     self.in_ctrl = false;
 
-                    let mut wr = WRITER.lock();
+                    let wr = get_writer();
                     let mut nuh_uh = false;
 
                     for c in self.control_buf[1..self.control_len].split(|c| *c == b';') {
@@ -103,7 +100,7 @@ impl Vt100 {
                     self.in_ctrl = true;
                     self.control_len = 0;
                 },
-                _ => WRITER.lock().write_byte(b),
+                _ => get_writer().write_byte(b),
             }
         }
     }
@@ -131,11 +128,10 @@ pub fn _print(args: fmt::Arguments) {
     use x86_64::instructions::interrupts;
 
     interrupts::without_interrupts(|| {
-        // WRITER.lock().write_fmt(args).unwrap();
-        VT100.lock().write_fmt(args).unwrap();
-
         unsafe {
-            let pos = 24 * BUFFER_WIDTH + WRITER.lock().column_position;
+            VT100.write_fmt(args).unwrap();
+
+            let pos = 24 * BUFFER_WIDTH + get_writer().column_position;
             PortWrite::write_to_port(0x3d4, 0x0f_u8);
             PortWrite::write_to_port(0x3d5, pos as u8);
             PortWrite::write_to_port(0x3d4, 0x0e_u8);

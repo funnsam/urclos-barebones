@@ -40,6 +40,8 @@ fn panic(info: &PanicInfo) -> ! {
 }
 
 fn init() {
+    vga_buffer::init();
+    serial::init();
     gdt::init();
     interrupts::init_idt();
     unsafe { interrupts::PICS.lock().initialize() };

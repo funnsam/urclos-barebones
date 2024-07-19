@@ -10,6 +10,8 @@ static SECTORS: AtomicU32 = AtomicU32::new(0);
 pub fn set_disk() {
     let mut parts = [(0, 0); 10];
     let mut partc = 0;
+
+    println!("Scanning disks");
     print_disk(false, &mut parts, &mut partc);
     print_disk(true, &mut parts, &mut partc);
 
