@@ -4,4 +4,4 @@
 *.o
 *.bc
 *.ll
-fs.img
+*.img

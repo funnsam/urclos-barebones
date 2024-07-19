@@ -4,14 +4,14 @@ use x86_64::instructions::port::*;
 
 const ATA_PRIM_BUS: u16 = 0x1f0;
 const ATA_PRIM_BUS0: Port<u16> = Port::new(ATA_PRIM_BUS + 0);
-const ATA_PRIM_BUS1: Port<u8> = Port::new(ATA_PRIM_BUS + 1);
+// const ATA_PRIM_BUS1: Port<u8> = Port::new(ATA_PRIM_BUS + 1);
 const ATA_PRIM_BUS2: Port<u8> = Port::new(ATA_PRIM_BUS + 2);
 const ATA_PRIM_BUS3: Port<u8> = Port::new(ATA_PRIM_BUS + 3);
 const ATA_PRIM_BUS4: Port<u8> = Port::new(ATA_PRIM_BUS + 4);
 const ATA_PRIM_BUS5: Port<u8> = Port::new(ATA_PRIM_BUS + 5);
 const ATA_PRIM_BUS6: Port<u8> = Port::new(ATA_PRIM_BUS + 6);
 const ATA_PRIM_BUS7: Port<u8> = Port::new(ATA_PRIM_BUS + 7);
-const ATA_PRIM_CTRL: Port<u8> = Port::new(0x3f6);
+// const ATA_PRIM_CTRL: Port<u8> = Port::new(0x3f6);
 
 pub fn flush_cache() -> Result<(), ()> {
     unsafe { ATA_PRIM_BUS7.write(0xe7); }
@@ -85,7 +85,7 @@ pub fn write_disk(slave: bool, lba: u32, data: &[u16]) -> Result<(), ()> {
     }
 }
 
-/*pub fn identify(slave: bool) -> Result<Option<[u16; 256]>, ()> {
+pub fn identify(slave: bool) -> Result<Option<[u16; 256]>, ()> {
     unsafe {
         ATA_PRIM_BUS6.write(0xa0 | ((slave as u8) << 4));
         ATA_PRIM_BUS2.write(0x00);
@@ -100,9 +100,9 @@ pub fn write_disk(slave: bool, lba: u32, data: &[u16]) -> Result<(), ()> {
 
         if ATA_PRIM_BUS4.read() == 0 && ATA_PRIM_BUS5.read() == 0 {
             wait_ok_or_err();
+            _has_err()?;
         }
 
-        _has_err()?;
         get_next_chunk().map(|a| Some(a))
     }
-}*/
+}

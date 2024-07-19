@@ -12,40 +12,57 @@ pub fn set_disk() {
     print_disk(false, &mut part, 0);
     print_disk(true, &mut part, 4);
 
-    if part.iter().any(|p| p.is_some()) {
-        loop {
+    match part.iter().filter(|p| p.is_some()).count() {
+        2.. => loop {
             println!("\x1b[33mSelect a partition as filesystem [0-7/*]\x1b[0m");
             let s = keyboard::poll_key() - b'0' as u32;
 
             if let Some(Some(p)) = part.get(s as usize) {
-                USE_DISK.store(true, Ordering::Relaxed);
-                USE_SLAVE.store(s >= 4, Ordering::Relaxed);
-                START_LBA.store(p.0, Ordering::Relaxed);
-                SECTORS.store(p.1, Ordering::Relaxed);
-
-                println!("\x1b[32;1mUsing partition #{s}\x1b[0m");
+                use_disk(s as usize, *p);
                 return;
             } else {
                 #[cfg(not(feature = "ramfs"))] {
                     println!("\x1b[31;1mInvalid partition\x1b[0m");
                 }
             }
-        }
-    } else {
-        #[cfg(not(feature = "ramfs"))] {
-            println!("\x1b[31;1mNo partition usable\x1b[0m");
-            crate::hlt_loop();
-        }
+        },
+        1 => {
+            let (s, p) = part.iter()
+                .enumerate()
+                .filter_map(|(s, p)| p.map(|p| (s, p)))
+                .next()
+                .unwrap();
+            use_disk(s, p);
+        },
+        0 => {
+            #[cfg(not(feature = "ramfs"))] {
+                println!("\x1b[31;1mNo partition usable\x1b[0m");
+                crate::hlt_loop();
+            }
+        },
     }
 }
 
+fn use_disk(s: usize, p: (u32, u32)) {
+    USE_DISK.store(true, Ordering::Relaxed);
+    USE_SLAVE.store(s >= 4, Ordering::Relaxed);
+    START_LBA.store(p.0, Ordering::Relaxed);
+    SECTORS.store(p.1, Ordering::Relaxed);
+
+    println!("\x1b[32;1mUsing partition #{s}\x1b[0m\n");
+}
+
 fn print_disk(slave: bool, part: &mut [Option<(u32, u32)>], start_idx: usize) {
+    if let Ok(Some(id)) = ata::identify(slave) {
+        let sec = (id[60] as u32) | ((id[61] as u32) << 16);
+        println!("\x1b[32;1mDisk {}:\x1b[0m {sec} sectors", slave as u8);
+    } else {
+        return;
+    }
+
     ata::initialize_read(slave, 0, 1);
 
     if let Ok(mbr) = ata::get_next_chunk() {
-        let id = (mbr[0xdc] as u32) | ((mbr[0xdd] as u32) << 16);
-        println!("\x1b[32;1mDisk {}:\x1b[0m (id {id:08x})", slave as u8);
-
         for (pi, _p) in mbr[0xdf..].chunks_exact(8).take(4).enumerate() {
             let mut p = [0; 16];
             for (p, b) in p.iter_mut().zip(_p.into_iter().flat_map(|w| w.to_le_bytes())) {
@@ -60,6 +77,8 @@ fn print_disk(slave: bool, part: &mut [Option<(u32, u32)>], start_idx: usize) {
 
             part[start_idx + pi] = Some((lba, sec));
         }
+    } else {
+        println!("  \x1b[31;1mFailed to read MBR\x1b[0m");
     }
 }
 

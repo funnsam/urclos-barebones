@@ -2,7 +2,7 @@
 #![no_main]
 #![feature(abi_x86_interrupt)]
 
-use core::{panic::PanicInfo, sync::atomic::Ordering};
+use core::panic::PanicInfo;
 
 mod gdt;
 mod serial;
