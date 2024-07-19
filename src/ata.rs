@@ -13,20 +13,11 @@ const ATA_PRIM_BUS6: Port<u8> = Port::new(ATA_PRIM_BUS + 6);
 const ATA_PRIM_BUS7: Port<u8> = Port::new(ATA_PRIM_BUS + 7);
 const ATA_PRIM_CTRL: Port<u8> = Port::new(0x3f6);
 
-// pub fn check_exists() -> bool {
-//     (unsafe { ATA_PRIM_BUS7.read() }) != 0xff
-// }
-// 
-// fn _check_exists() -> Result<(), ()> {
-//     check_exists().then_some(()).ok_or(())
-// }
-// 
-// pub fn flush_cache() -> Result<(), ()> {
-//     _check_exists()?;
-//     unsafe { ATA_PRIM_CTRL.write(0xe7); }
-//     wait_busy_clear();
-//     Ok(())
-// }
+pub fn flush_cache() -> Result<(), ()> {
+    unsafe { ATA_PRIM_BUS7.write(0xe7); }
+    wait_busy_clear();
+    Ok(())
+}
 
 fn wait_busy_clear() {
     while unsafe { ATA_PRIM_BUS7.read() } & 0x80 != 0 {}
@@ -47,7 +38,6 @@ fn _has_err() -> Result<(), ()> {
 pub fn initialize_read(slave: bool, lba: u32, sectors: u8) {
     unsafe {
         ATA_PRIM_BUS6.write(0xe0 | ((slave as u8) << 4) | ((lba >> 24) as u8 & 0xf));
-        ATA_PRIM_BUS1.write(0x00);
         ATA_PRIM_BUS2.write(sectors);
         ATA_PRIM_BUS3.write(lba as u8);
         ATA_PRIM_BUS4.write((lba >> 8) as u8);
@@ -59,8 +49,8 @@ pub fn initialize_read(slave: bool, lba: u32, sectors: u8) {
 pub fn get_next_chunk() -> Result<[u16; 256], ()> {
     unsafe {
         wait_busy_clear();
-        _has_err()?;
         wait_ok_or_err();
+        _has_err()?;
 
         let mut buf = [0; 256];
         for i in buf.iter_mut() {
@@ -68,6 +58,30 @@ pub fn get_next_chunk() -> Result<[u16; 256], ()> {
         }
 
         Ok(buf)
+    }
+}
+
+pub fn write_disk(slave: bool, lba: u32, data: &[u16]) -> Result<(), ()> {
+    assert!(data.len() % 256 == 0);
+
+    unsafe {
+        ATA_PRIM_BUS6.write(0xe0 | ((slave as u8) << 4) | ((lba >> 24) as u8 & 0xf));
+        ATA_PRIM_BUS2.write((data.len() / 256) as u8);
+        ATA_PRIM_BUS3.write(lba as u8);
+        ATA_PRIM_BUS4.write((lba >> 8) as u8);
+        ATA_PRIM_BUS5.write((lba >> 16) as u8);
+        ATA_PRIM_BUS7.write(0x30);
+
+
+        wait_busy_clear();
+        wait_ok_or_err();
+        _has_err()?;
+
+        for w in data.iter() {
+            ATA_PRIM_BUS0.write(*w);
+        }
+
+        flush_cache()
     }
 }
 

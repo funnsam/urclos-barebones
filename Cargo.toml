@@ -19,8 +19,11 @@ raw-cpuid = "11.0.2"
 version = "1.0"
 features = ["spin_no_std"]
 
+[features]
+ramfs = []
+
 [package.metadata.bootimage]
 run-args = [
-    "-drive", "file=fs.bin,if=ide,format=raw",
+    "-drive", "file=fs.img,if=ide,format=raw",
     "-serial", "stdio",
 ]

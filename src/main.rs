@@ -16,6 +16,7 @@ mod interrupts;
 mod console;
 mod vga_buffer;
 
+#[cfg(feature = "ramfs")]
 mod ramfs;
 mod bindings;
 
@@ -25,17 +26,10 @@ pub extern "C" fn _start() -> ! {
     fs::set_disk();
 
     unsafe { bindings::urcl_main(); }
+
+    fs::flush_changes();
     println!("\x1b[1mURCL-OS halted\x1b[0m");
-
     hlt_loop();
-}
-
-fn comfirm() -> bool {
-    loop {
-        if let Some(k) = keyboard::read_key() {
-            return k == 'Y' as u32;
-        }
-    }
 }
 
 #[panic_handler]
