@@ -1,8 +1,6 @@
 use core::sync::atomic::*;
 use crate::*;
 
-pub static USE_DISK: AtomicBool = AtomicBool::new(false);
-
 #[link(name = "urcl")]
 extern "C" {
     pub fn urcl_main();
@@ -19,7 +17,7 @@ pub extern "C" fn urcl_in(port: usize) -> usize {
             }
         },
         32 => ADDRESS.load(Ordering::Relaxed),
-        33 => unsafe { fs::FS[ADDRESS.load(Ordering::Relaxed)] as usize },
+        33 => fs::read(ADDRESS.load(Ordering::Relaxed)) as usize,
         _ => {
             println!("todo port {port}");
             loop {}
@@ -33,7 +31,7 @@ pub extern "C" fn urcl_out(port: usize, data: usize) {
         1 => print!("{}", data as u8 as char),
         2 | 24 | 25 => print!("{data}"), // TODO: sign ext
         32 => { ADDRESS.store(data, Ordering::Relaxed); },
-        33 => unsafe { fs::FS[ADDRESS.load(Ordering::Relaxed)] = data as u16; },
+        33 => fs::write(ADDRESS.load(Ordering::Relaxed), data as u16),
         _ => println!("todo port {port}"),
     }
 }

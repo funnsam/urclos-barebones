@@ -19,5 +19,5 @@ pub static mut FS: [u16; {f.tell() >> 1}] = ["""
 
 out += "];"
 
-with open("src/fs.rs", "w") as f:
+with open("src/ramfs.rs", "w") as f:
     f.write(out)

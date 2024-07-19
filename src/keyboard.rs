@@ -16,3 +16,11 @@ pub fn register_key(k: u32) {
         INCOMING_KEY.store(true, Ordering::Relaxed);
     }
 }
+
+pub fn poll_key() -> u32 {
+    loop {
+        if let Some(k) = read_key() {
+            return k;
+        }
+    }
+}
