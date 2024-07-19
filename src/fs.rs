@@ -14,7 +14,7 @@ pub fn set_disk() {
 
     match part.iter().filter(|p| p.is_some()).count() {
         2.. => loop {
-            println!("\x1b[33mSelect a partition as filesystem [0-7/*]\x1b[0m");
+            println!("\n\x1b[33mSelect a partition as filesystem [0-7/*]\x1b[0m");
             let s = keyboard::poll_key() - b'0' as u32;
 
             if let Some(Some(p)) = part.get(s as usize) {
@@ -36,7 +36,7 @@ pub fn set_disk() {
         },
         0 => {
             #[cfg(not(feature = "ramfs"))] {
-                println!("\x1b[31;1mNo partition usable\x1b[0m");
+                println!("\n\x1b[31;1mNo partition usable\x1b[0m");
                 crate::hlt_loop();
             }
         },
@@ -55,7 +55,7 @@ fn use_disk(s: usize, p: (u32, u32)) {
 fn print_disk(slave: bool, part: &mut [Option<(u32, u32)>], start_idx: usize) {
     if let Ok(Some(id)) = ata::identify(slave) {
         let sec = (id[60] as u32) | ((id[61] as u32) << 16);
-        println!("\x1b[32;1mDisk {}:\x1b[0m {sec} sectors", slave as u8);
+        println!("\x1b[32;1mDisk {}:\x1b[0m {}KiB", slave as u8, sec >> 1);
     } else {
         return;
     }
@@ -63,7 +63,14 @@ fn print_disk(slave: bool, part: &mut [Option<(u32, u32)>], start_idx: usize) {
     ata::initialize_read(slave, 0, 1);
 
     if let Ok(mbr) = ata::get_next_chunk() {
+        if mbr[0xde] == 0x5a5a {
+            println!("  \x1b[33;1mDisk marked as read only\x1b[0m");
+            return;
+        }
+
         for (pi, _p) in mbr[0xdf..].chunks_exact(8).take(4).enumerate() {
+            let gpi = start_idx + pi;
+
             let mut p = [0; 16];
             for (p, b) in p.iter_mut().zip(_p.into_iter().flat_map(|w| w.to_le_bytes())) {
                 *p = b;
@@ -73,9 +80,11 @@ fn print_disk(slave: bool, part: &mut [Option<(u32, u32)>], start_idx: usize) {
 
             let lba = u32::from_le_bytes(p[0x8..0xc].try_into().unwrap());
             let sec = u32::from_le_bytes(p[0xc..0x10].try_into().unwrap());
-            println!("  \x1b[1m[{}]:\x1b[0m Partition {pi}: LBA {lba}, {sec} sectors", start_idx + pi);
+            let kib = sec >> 1;
 
-            part[start_idx + pi] = Some((lba, sec));
+            println!("  \x1b[1m[{gpi}]:\x1b[0m Partition {pi}: LBA {lba}, {kib}KiB");
+
+            part[gpi] = Some((lba, sec));
         }
     } else {
         println!("  \x1b[31;1mFailed to read MBR\x1b[0m");

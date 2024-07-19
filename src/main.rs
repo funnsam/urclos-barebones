@@ -34,6 +34,7 @@ pub extern "C" fn _start() -> ! {
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
+    serial_println!("{}", info);
     println!("{}", info);
     hlt_loop();
 }

@@ -18,7 +18,7 @@ fs.img: to_le.py
 	python3 to_le.py $(FS_PATH) $@
 	echo -e "o\nn\n\n\n\n\nt\n2c\nw\n" | fdisk $@
 
-urclos.img: liburcl.a src/ramfs.rs
+urclos.img: liburcl.a src/* Cargo.toml Cargo.lock build.rs x86_64-blog_os.json
 	cargo bootimage -r
 	
 	cp target/x86_64-blog_os/release/bootimage-urclos.bin $@
