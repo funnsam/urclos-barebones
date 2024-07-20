@@ -28,8 +28,7 @@ pub extern "C" fn _start() -> ! {
     unsafe { bindings::urcl_main(); }
 
     fs::flush_changes();
-    println!("\x1b[1mURCL-OS halted\x1b[0m");
-    hlt_loop();
+    reboot();
 }
 
 #[panic_handler]
@@ -52,4 +51,14 @@ pub fn hlt_loop() -> ! {
     loop {
         x86_64::instructions::hlt();
     }
+}
+
+pub fn reboot() -> ! {
+    let mut t = 2_u8;
+    let mut p = x86_64::instructions::port::Port::new(0x64);
+    while t & 2 != 0 {
+        t = unsafe { p.read() };
+    }
+    unsafe { p.write(0xfe); }
+    hlt_loop();
 }
