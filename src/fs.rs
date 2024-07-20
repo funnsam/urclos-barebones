@@ -73,11 +73,9 @@ fn print_disk(slave: bool, parts: &mut [(u32, u32)], partc: &mut usize) {
     if let Ok(Some(id)) = ata::identify(slave) {
         let sec = (id[60] as u32) | ((id[61] as u32) << 16);
         println!("\x1b[32;1mDisk {}:\x1b[0m {}KiB", slave as u8, sec >> 1);
-    } else {
-        return;
-    }
 
-    print_parts(slave, 0, 0, 1, parts, partc)
+        print_parts(slave, 0, 0, 1, parts, partc)
+    }
 }
 
 fn print_parts(slave: bool, lba: u32, lbar: u32, poff: usize, parts: &mut [(u32, u32)], partc: &mut usize) {
