@@ -5,6 +5,10 @@ run-ide: urclos.img
 	qemu-system-x86_64 -serial stdio \
 		-drive file=urclos.img,if=ide,format=raw
 
+run-ramfs: urclos_ramfs.img
+	qemu-system-x86_64 -serial stdio \
+		-drive file=urclos_ramfs.img,if=ide,format=raw
+
 urcl.o: $(URCLOS_PATH)
 	urcl-llvm $(URCLOS_PATH) --triple x86_64-unknown-none --features ",-mmx,-sse,-bmi2,+soft-float" -O3 --max-ram 65536 --use-global
 
@@ -27,6 +31,10 @@ urclos.img: liburcl.a src/* Cargo.toml Cargo.lock build.rs x86_64-blog_os.json $
 	
 	python3 to_le.py $(FS_PATH) $@
 	echo -e "n\n\n\n\n\nt\n1\n2c\nd\n4\nw\n" | fdisk $@
+
+urclos_ramfs.img: liburcl.a src/* src/ramfs.rs Cargo.toml Cargo.lock build.rs x86_64-blog_os.json $(FS_PATH)
+	cargo bootimage -r --no-default-features --features ramfs
+	cp target/x86_64-blog_os/release/bootimage-urclos.bin $@
 
 clean:
 	- rm *.o *.a *.img src/ramfs.rs

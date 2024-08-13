@@ -7,6 +7,7 @@ static USE_SLAVE: AtomicBool = AtomicBool::new(false);
 static START_LBA: AtomicU32 = AtomicU32::new(0);
 static SECTORS: AtomicU32 = AtomicU32::new(0);
 
+#[cfg(feature = "atafs")]
 pub fn set_disk() {
     let mut parts = [(0, 0); 10];
     let mut partc = 0;
@@ -59,6 +60,9 @@ pub fn set_disk() {
         },
     }
 }
+
+#[cfg(not(feature = "atafs"))]
+pub fn set_disk() {}
 
 fn use_disk(s: usize, p: (u32, u32)) {
     USE_DISK.store(true, Ordering::Relaxed);
